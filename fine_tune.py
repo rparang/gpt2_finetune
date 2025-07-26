@@ -353,10 +353,10 @@ class QADataLoader:
 # ----------------------------------------------------------
 
 
-batch_size = 8
+batch_size = 16
 max_length = 1024
 
-dataloader = QADataLoader("qa_dataset.jsonl", max_length=max_length)
+dataloader = QADataLoader("datasets/qa_dataset.jsonl", max_length=max_length)
 
 model = GPT(GPTConfig())
 model = model.from_pretrained('gpt2-medium')
