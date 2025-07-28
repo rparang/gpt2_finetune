@@ -353,8 +353,8 @@ class QADataLoader:
 # ----------------------------------------------------------
 
 
-batch_size = 32
-max_length = 1024
+batch_size = 16
+max_length = 512
 
 dataloader = QADataLoader("datasets/alpaca_data.jsonl", max_length=max_length)
 
