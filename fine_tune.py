@@ -353,10 +353,10 @@ class QADataLoader:
 # ----------------------------------------------------------
 
 
-batch_size = 16
+batch_size = 32
 max_length = 1024
 
-dataloader = QADataLoader("datasets/qa_dataset.jsonl", max_length=max_length)
+dataloader = QADataLoader("datasets/alpaca_data.jsonl", max_length=max_length)
 
 model = GPT(GPTConfig())
 model = model.from_pretrained('gpt2-medium')
@@ -383,7 +383,7 @@ if torch.cuda.is_available():
 # Send model to device
 model.to(device)
 
-epochs = 3
+epochs = 2
 learning_rate = 2e-5
 epsilon = 1e-8
 max_steps = len(dataloader.samples) // batch_size
@@ -407,7 +407,7 @@ for epoch in range(epochs):
         # generate sample
         if step > 0 and step % 1000 == 0:
             model.eval()
-            model.generate(max_length=30, device=device, tokenizer=tokenizer, query="When was Donald trump born?")
+            model.generate(max_length=30, device=device, tokenizer=tokenizer, query="Generate a list of present continuous verbs.")
 
         # train
         model.train()
