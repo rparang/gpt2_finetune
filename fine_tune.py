@@ -352,9 +352,31 @@ class QADataLoader:
 
 # ----------------------------------------------------------
 
+def save(model, optimizer, losses, filename):
+	filename = f"{filename}.pt"
+	directory = 'model/'
+	os.makedirs(directory, exist_ok=True)
+	filepath = os.path.join(directory, filename)
+	checkpoint = {
+		'model_state_dict': model.state_dict(),
+		'optimizer_state_dict': optimizer.state_dict(),
+		'loss': losses
+	}
+	torch.save(checkpoint, filepath)
+	print(f"Model saved: {filepath}")
 
-batch_size = 32
-max_length = 1024
+
+# ----------------------------------------------------------
+
+torch.manual_seed(1337)
+if torch.cuda.is_available():
+	torch.cuda.manual_seed(1337)
+
+
+batch_size = 16
+max_length = 512
+model_save_path = '/model'
+
 
 dataloader = QADataLoader("datasets/alpaca_data.jsonl", max_length=max_length)
 
@@ -375,9 +397,8 @@ elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
 	device = "mps"
 print(f"using device: {device}")
 
-torch.manual_seed(1337)
-if torch.cuda.is_available():
-	torch.cuda.manual_seed(1337)
+
+torch.set_float32_matmul_precision('high')
 
 
 # Send model to device
@@ -390,7 +411,10 @@ max_steps = len(dataloader.samples) // batch_size
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, eps=epsilon)
 
-lossi = []
+losses = {
+    'training': [],
+    'val': []
+}
 
 for epoch in range(epochs):
     for step in range(max_steps):
@@ -403,6 +427,7 @@ for epoch in range(epochs):
                 x, y, att_mask = x.to(device), y.to(device), att_mask.to(device)
                 logits, loss = model(x, y, att_mask)
                 print(f"step {step}, validation loss: {loss.item()}")
+                losses['val'].append(loss.item())
 
         # generate sample
         if step > 0 and step % 1000 == 0:
@@ -419,9 +444,10 @@ for epoch in range(epochs):
         optimizer.step()
         if step % 100 == 0:
             print(f"step {step}, training loss: {loss.item()}")
-        lossi.append(loss.item())
+        losses['training'].append(loss.item())
 
 
+save(model, optimizer, losses, "final")
 
 
 
