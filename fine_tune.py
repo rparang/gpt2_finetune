@@ -406,7 +406,7 @@ torch.set_float32_matmul_precision('high')
 model.to(device)
 
 epochs = 2
-learning_rate = 2e-5
+learning_rate = 3e-4
 epsilon = 1e-8
 max_steps = len(dataloader.samples) // batch_size
 
