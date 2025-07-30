@@ -1,6 +1,7 @@
 import os
 import tiktoken
 import math
+import time
 from dataclasses import dataclass
 import torch
 import torch.nn as nn
@@ -26,6 +27,7 @@ class CausalSelfAttention(nn.Module):
 		self.n_embd = config.n_embd
 
 		self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size)).view(1, 1, config.block_size, config.block_size))
+		self.dropout = nn.Dropout(dropout)
 
 	def forward(self, x, attention_mask=None):
 
@@ -53,6 +55,7 @@ class CausalSelfAttention(nn.Module):
 			att = att.masked_fill(attention_mask == 0, float('-inf'))
 
 		att = F.softmax(att, dim=-1)
+		att = self.dropout(att)
 
 		y = att @ v # (B, nh, T, T) x (B, nh, T, hs) --> (B, nh, T, hs)
 		y = y.transpose(1, 2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
@@ -70,11 +73,13 @@ class MLP(nn.Module):
 		self.gelu = nn.GELU(approximate='tanh')
 		self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd)
 		self.c_proj.NANOGPT_SCALE_INIT = 1 # set flag so we know on initialization we need to scale down the std for these residual streams
+		self.dropout = nn.Dropout(dropout)
 
 	def forward(self, x):
 		x = self.c_fc(x)
 		x = self.gelu(x)
 		x = self.c_proj(x)
+		x = self.dropout(x)
 		return x
 
 
@@ -374,6 +379,7 @@ if torch.cuda.is_available():
 	torch.cuda.manual_seed(1337)
 
 
+dropout = 0.2
 batch_size = 16
 max_length = 512
 model_save_path = '/model'
@@ -404,13 +410,16 @@ torch.set_float32_matmul_precision('high')
 
 # Send model to device
 model.to(device)
+use_compile = True
+if use_compile:
+	model = torch.compile(model)
 
 epochs = 2
-learning_rate = 3e-4
+learning_rate = 1e-5
 epsilon = 1e-8
 max_steps = len(dataloader.samples) // batch_size
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, eps=epsilon)
+optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, eps=epsilon, weight_decay=0.05)
 
 losses = {
     'training': [],
@@ -419,6 +428,7 @@ losses = {
 
 for epoch in range(epochs):
     for step in range(max_steps):
+    	t0 = time.time()
 
         # validation loss
         if step % 100 == 0:
@@ -433,7 +443,7 @@ for epoch in range(epochs):
         # generate sample
         if step > 0 and step % 1000 == 0:
             model.eval()
-            model.generate(max_length=30, device=device, tokenizer=tokenizer, query="Generate a list of present continuous verbs.")
+            model.generate(max_length=30, device=device, tokenizer=tokenizer, query="List 3 properties of oxygen.")
 
         # train
         model.train()
@@ -443,8 +453,12 @@ for epoch in range(epochs):
         logits, loss = model(x, y, att_mask)
         loss.backward()
         optimizer.step()
-        if step % 100 == 0:
-            print(f"step {step}, training loss: {loss.item()}")
+
+        t1 = time.time()
+        dt = t1 - t0
+		tokens_processed = batch_size * x.size(-1) # Note that each batch size will have a dynamic length which is why we look at length of tokens in the batch which always gets the max length
+		tokens_per_sec = tokens_processed / dt
+		print(f"step {step} | training loss: {loss.item():.6f} | lr: {learning_rate:.4e} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec}")
         losses['training'].append(loss.item())
 
 
