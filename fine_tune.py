@@ -266,93 +266,93 @@ class GPT(nn.Module):
 
 
 class QADataLoader:
-    def __init__(self, filepath, max_length=512, shuffle=True):
-        self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        self.max_length = max_length
-        self.shuffle = shuffle
+	def __init__(self, filepath, max_length=512, shuffle=True):
+		self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+		self.max_length = max_length
+		self.shuffle = shuffle
 
-        self.tokenizer.add_special_tokens({
-            "bos_token": "<BOS>",
-            "eos_token": "<EOS>",
-            "sep_token": "<SEP>",
-            "pad_token": "<PAD>"
-        })
+		self.tokenizer.add_special_tokens({
+			"bos_token": "<BOS>",
+			"eos_token": "<EOS>",
+			"sep_token": "<SEP>",
+			"pad_token": "<PAD>"
+		})
 
-        self.special_tokens = {
-            "<BOS>": self.tokenizer.encode("<BOS>")[0],
-            "<SEP>": self.tokenizer.encode("<SEP>")[0],
-            "<EOS>": self.tokenizer.encode("<EOS>")[0],
-            "<PAD>": self.tokenizer.encode("<PAD>")[0]
-        }
+		self.special_tokens = {
+			"<BOS>": self.tokenizer.encode("<BOS>")[0],
+			"<SEP>": self.tokenizer.encode("<SEP>")[0],
+			"<EOS>": self.tokenizer.encode("<EOS>")[0],
+			"<PAD>": self.tokenizer.encode("<PAD>")[0]
+		}
 
-        self.samples = []
-        with open(filepath, 'r') as f:
-            for line in f:
-                item = json.loads(line.strip())
-                q, a = item["prompt"], item["completion"]
-                tokens = self.encode_sample(q, a)
-                if len(tokens["input_ids"]) <= self.max_length:
-                    self.samples.append(tokens)
+		self.samples = []
+		with open(filepath, 'r') as f:
+			for line in f:
+				item = json.loads(line.strip())
+				q, a = item["prompt"], item["completion"]
+				tokens = self.encode_sample(q, a)
+				if len(tokens["input_ids"]) <= self.max_length:
+					self.samples.append(tokens)
 
-        n = int(len(self.samples) * 0.9)
+		n = int(len(self.samples) * 0.9)
 
-        self.train_data = self.samples[:n]
-        self.val_data = self.samples[n:]
+		self.train_data = self.samples[:n]
+		self.val_data = self.samples[n:]
 
-    def encode_sample(self, question, answer):
-        q_tokens = self.tokenizer.encode(question)
-        a_tokens = self.tokenizer.encode(answer)
+	def encode_sample(self, question, answer):
+		q_tokens = self.tokenizer.encode(question)
+		a_tokens = self.tokenizer.encode(answer)
 
-        input_ids = (
-            [self.special_tokens["<BOS>"]] +
-            q_tokens +
-            [self.special_tokens["<SEP>"]] +
-            a_tokens +
-            [self.special_tokens["<EOS>"]]
-        )
+		input_ids = (
+			[self.special_tokens["<BOS>"]] +
+			q_tokens +
+			[self.special_tokens["<SEP>"]] +
+			a_tokens +
+			[self.special_tokens["<EOS>"]]
+		)
 
-        label_ids = input_ids[1:] + [-100] # Shift labels rightward by one to line up the labels
-        ignore_length = len(q_tokens) + 1 # To account for q_token length and the <SEP> special token. Note the shift to the right above accounted for <BOS>
-        label_ids[:ignore_length] = [-100] * ignore_length
+		label_ids = input_ids[1:] + [-100] # Shift labels rightward by one to line up the labels
+		ignore_length = len(q_tokens) + 1 # To account for q_token length and the <SEP> special token. Note the shift to the right above accounted for <BOS>
+		label_ids[:ignore_length] = [-100] * ignore_length
 
-        return {"input_ids": input_ids, "label_ids": label_ids}
+		return {"input_ids": input_ids, "label_ids": label_ids}
 
 
-    def __len__(self):
-        return len(self.samples)
+	def __len__(self):
+		return len(self.samples)
 
-    def get_tokenizer(self):
-        return self.tokenizer
+	def get_tokenizer(self):
+		return self.tokenizer
 
-    def get_batch(self, batch_size, split):
+	def get_batch(self, batch_size, split):
 
-        data = self.train_data if split == 'train' else self.val_data
+		data = self.train_data if split == 'train' else self.val_data
 
-        if self.shuffle:
-            batch = random.sample(data, batch_size)
-        else:
-            batch = data[:batch_size]
+		if self.shuffle:
+			batch = random.sample(data, batch_size)
+		else:
+			batch = data[:batch_size]
 
-        max_len = max(len(sample["input_ids"]) for sample in batch)
-        input_ids_batch = []
-        label_ids_batch = []
-        attention_mask_batch = []
+		max_len = max(len(sample["input_ids"]) for sample in batch)
+		input_ids_batch = []
+		label_ids_batch = []
+		attention_mask_batch = []
 
-        for sample in batch:
-            pad_len = max_len - len(sample["input_ids"])
-            input_ids = sample["input_ids"] + [self.special_tokens["<PAD>"]] * pad_len
-            label_ids = sample["label_ids"] + [-100] * pad_len
-            attention_mask = [1] * len(sample["input_ids"]) + [0] * pad_len
+		for sample in batch:
+			pad_len = max_len - len(sample["input_ids"])
+			input_ids = sample["input_ids"] + [self.special_tokens["<PAD>"]] * pad_len
+			label_ids = sample["label_ids"] + [-100] * pad_len
+			attention_mask = [1] * len(sample["input_ids"]) + [0] * pad_len
 
-            input_ids_batch.append(input_ids)
-            label_ids_batch.append(label_ids)
-            attention_mask_batch.append(attention_mask)
+			input_ids_batch.append(input_ids)
+			label_ids_batch.append(label_ids)
+			attention_mask_batch.append(attention_mask)
 
-        input_ids_batch = torch.tensor(input_ids_batch)
-        label_ids_batch = torch.tensor(label_ids_batch)
-        attention_mask_batch = torch.tensor(attention_mask_batch)
+		input_ids_batch = torch.tensor(input_ids_batch)
+		label_ids_batch = torch.tensor(label_ids_batch)
+		attention_mask_batch = torch.tensor(attention_mask_batch)
 
-        return input_ids_batch, label_ids_batch, attention_mask_batch
+		return input_ids_batch, label_ids_batch, attention_mask_batch
 
 
 
@@ -422,44 +422,44 @@ max_steps = len(dataloader.samples) // batch_size
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, eps=epsilon, weight_decay=0.05)
 
 losses = {
-    'training': [],
-    'val': []
+	'training': [],
+	'val': []
 }
 
 for epoch in range(epochs):
-    for step in range(max_steps):
-    	t0 = time.time()
+	for step in range(max_steps):
+		t0 = time.time()
 
-        # validation loss
-        if step % 100 == 0:
-            model.eval()
-            with torch.no_grad():
-                x, y, att_mask = dataloader.get_batch(batch_size, 'val')
-                x, y, att_mask = x.to(device), y.to(device), att_mask.to(device)
-                logits, loss = model(x, y, att_mask)
-                print(f"step {step}, validation loss: {loss.item()}")
-                losses['val'].append(loss.item())
+		# validation loss
+		if step % 100 == 0:
+			model.eval()
+			with torch.no_grad():
+				x, y, att_mask = dataloader.get_batch(batch_size, 'val')
+				x, y, att_mask = x.to(device), y.to(device), att_mask.to(device)
+				logits, loss = model(x, y, att_mask)
+				print(f"step {step}, validation loss: {loss.item()}")
+				losses['val'].append(loss.item())
 
-        # generate sample
-        if step > 0 and step % 1000 == 0:
-            model.eval()
-            model.generate(max_length=30, device=device, tokenizer=tokenizer, query="List 3 properties of oxygen.")
+		# generate sample
+		if step > 0 and step % 1000 == 0:
+			model.eval()
+			model.generate(max_length=30, device=device, tokenizer=tokenizer, query="List 3 properties of oxygen.")
 
-        # train
-        model.train()
-        x, y, att_mask = dataloader.get_batch(batch_size, 'train')
-        x, y, att_mask = x.to(device), y.to(device), att_mask.to(device)
-        optimizer.zero_grad()
-        logits, loss = model(x, y, att_mask)
-        loss.backward()
-        optimizer.step()
+		# train
+		model.train()
+		x, y, att_mask = dataloader.get_batch(batch_size, 'train')
+		x, y, att_mask = x.to(device), y.to(device), att_mask.to(device)
+		optimizer.zero_grad()
+		logits, loss = model(x, y, att_mask)
+		loss.backward()
+		optimizer.step()
 
-        t1 = time.time()
-        dt = t1 - t0
+		t1 = time.time()
+		dt = t1 - t0
 		tokens_processed = batch_size * x.size(-1) # Note that each batch size will have a dynamic length which is why we look at length of tokens in the batch which always gets the max length
 		tokens_per_sec = tokens_processed / dt
 		print(f"step {step} | training loss: {loss.item():.6f} | lr: {learning_rate:.4e} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec}")
-        losses['training'].append(loss.item())
+		losses['training'].append(loss.item())
 
 
 save(model, optimizer, losses, "final")
