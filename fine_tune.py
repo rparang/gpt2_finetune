@@ -1,5 +1,4 @@
 import os
-import tiktoken
 import math
 import time
 from dataclasses import dataclass
@@ -458,7 +457,7 @@ for epoch in range(epochs):
 		dt = t1 - t0
 		tokens_processed = batch_size * x.size(-1) # Note that each batch size will have a dynamic length which is why we look at length of tokens in the batch which always gets the max length
 		tokens_per_sec = tokens_processed / dt
-		print(f"step {step} | training loss: {loss.item():.6f} | lr: {learning_rate:.4e} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec}")
+		print(f"step {step} | training loss: {loss.item():.6f} | lr: {learning_rate:.4e} | dt: {dt*1000:.2f}ms | tok/sec: {tokens_per_sec:.2f}")
 		losses['training'].append(loss.item())
 
 
